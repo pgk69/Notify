@@ -95,28 +95,36 @@ if ($@) {
 }
 $VERSION = $prg->version($VERSION);
 
-my ($type, $app, $event, $desc, $prio, $user, $key, %users);
-$type  = defined(CmdLine->option('Service'))     ? CmdLine->option('Service')     : 'Prowl'; 
-$app   = defined(CmdLine->option('Application')) ? CmdLine->option('Application') : "Notifytest $type";
+my ($type, $app, $event, $desc, $prio, $user, $key, @types, %users);
+@types = defined(CmdLine->option('Service'))     ? CmdLine->option('Service')     : ('Prowl', 'NMA'); 
 $event = defined(CmdLine->option('Event'))       ? CmdLine->option('Event')       : 'Testbenachrichtigung';
 $desc  = defined(CmdLine->option('Comment'))     ? CmdLine->option('Comment')     : 'Bislang keine weiteren Details';
 $prio  = defined(CmdLine->option('Prio'))        ? CmdLine->option('Prio')        : 1; 
 $user  = defined(CmdLine->option('User'))        ? CmdLine->option('User')        : undef; 
 $key   = defined(CmdLine->option('APIKey'))      ? CmdLine->option('Key')         : undef; 
 
-if (defined($type) && defined($user) && defined(Configuration->config($type, $user))) {
-  %users = ($user => Configuration->config($type, $user));
-} else {
-  %users = defined($type) ? Configuration->config($type) : {};
+foreach $type (@types) {
+  if (defined($type)) {
+    $app = defined(CmdLine->option('Application')) ? CmdLine->option('Application') : "Notifytest $type";
+    if (defined($user) && defined(Configuration->config($type, $user))) {
+      %users = ($user => Configuration->config($type, $user));
+    } else {
+      %users = Configuration->config($type);
+    }
+  } else {
+    %users = {};
+  }
+  foreach $user (keys(%users)) {
+    $prg->sendNotification(Type        => $type,
+                           Application => $app,
+                           Event       => $event,
+                           Description => $desc,
+                           Priority    => $prio,
+                           URL         => 'https://github.com/pgk69',
+                           Users       => \%users,
+                           Key         => $key);
+  }
 }
-$prg->sendNotification(Type        => $type,
-                       Application => $app,
-                       Event       => $event,
-                       Description => $desc,
-                       Priority    => $prio,
-                       URL         => 'https://github.com/pgk69',
-                       Users       => \%users,
-                       Key         => $key);
 
 Trace->Exit(0, 1, 0x00002, Configuration->config('Prg', 'Name'), $VERSION);
 
