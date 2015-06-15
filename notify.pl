@@ -61,7 +61,13 @@ use Fcntl;
 #
 
 # Option-Objekt: Liest und speichert die Kommandozeilenparameter
-$VERSION = CmdLine->new('Dummy'  => 'dummy:s')->version($VERSION);
+$VERSION = CmdLine->new('Service'     => 'webservice:s',
+                        'Application' => 'application:s',
+                        'Event'       => 'event:s',
+                        'Comment'     => 'comment:s',
+                        'Prio'        => 'priority:s',
+                        'User'        => 'user:s',
+                        'APIKey'      => 'key:s')->version($VERSION);
 
 # Trace-Objekt: Liest und speichert die Meldungstexte; gibt Tracemeldungen aus
 $VERSION = Trace->new()->version($VERSION);
@@ -88,34 +94,30 @@ if ($@) {
   Trace->Exit(0, 1, 0x0ffff, Configuration->config('Prg', 'Name'), $VERSION);
 }
 $VERSION = $prg->version($VERSION);
-#DBAccess->set_pers_Var(Configuration->config('DB', 'MYDB').'.config', 'Start');
 
-my %users;
-# Prowl
-%users = Configuration->config('Prowl');
-$prg->sendNotification(Application => 'Notifytest Prowl',
-                       Event       => 'Testbenachrichtigung',
-                       Description => 'Bislang keine weiteren Details',
-                       Priority    => '1',
+my ($type, $app, $event, $desc, $prio, $user, $key, %users);
+$type  = defined(CmdLine->option('Service'))     ? CmdLine->option('Service')     : 'Prowl'; 
+$app   = defined(CmdLine->option('Application')) ? CmdLine->option('Application') : "Notifytest $type";
+$event = defined(CmdLine->option('Event'))       ? CmdLine->option('Event')       : 'Testbenachrichtigung';
+$desc  = defined(CmdLine->option('Comment'))     ? CmdLine->option('Comment')     : 'Bislang keine weiteren Details';
+$prio  = defined(CmdLine->option('Prio'))        ? CmdLine->option('Prio')        : 1; 
+$user  = defined(CmdLine->option('User'))        ? CmdLine->option('User')        : undef; 
+$key   = defined(CmdLine->option('APIKey'))      ? CmdLine->option('Key')         : undef; 
+
+if (defined($type) && defined($user) && defined(Configuration->config($type, $user))) {
+  %users = ($user => Configuration->config($type, $user));
+} else {
+  %users = defined($type) ? Configuration->config($type) : {};
+}
+$prg->sendNotification(Type        => $type,
+                       Application => $app,
+                       Event       => $event,
+                       Description => $desc,
+                       Priority    => $prio,
                        URL         => 'https://github.com/pgk69',
                        Users       => \%users,
-                       Type        => 'Prowl');
+                       Key         => $key);
 
-# NMA
-%users = Configuration->config('NMA');
-$prg->sendNotification(Application => 'Notifytest NMA',
-                       Event       => 'Testbenachrichtigung',
-                       Description => 'Bislang keine weiteren Details',
-                       Priority    => '1',
-                       URL         => 'https://github.com/pgk69',
-                       Users       => \%users,
-                       Type        => 'NMA');
-
-#my $cron = new Schedule::Cron($prg->can('action'), nofork => 1);
-#$cron->add_entry(Configuration->config('Prg', 'Aktiv'));
-#$cron->run();
-
-#DBAccess->set_pers_Var(Configuration->config('DB', 'MYDB').'.config', 'Ende '.CmdLine->new()->{ArgStrgRAW});
 Trace->Exit(0, 1, 0x00002, Configuration->config('Prg', 'Name'), $VERSION);
 
 exit 1;

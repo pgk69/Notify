@@ -198,13 +198,14 @@ sub sendNotification {
   #     sendnotification
   #     Proc 1
   my $self = shift;
-  my %args = (Application => 'Notify',
+  my %args = (Type        => 'Prowl',
+              Application => 'Notify',
               Event       => 'Benachrichtigung',
               Description => 'Keine weiteren Details',
               Priority    => '1',
               URL         => 'https://github.com/pgk69',
               Users       => undef,
-              Type        => 'Prowl',
+              Key         => undef,
               @_);
 
   my $merker          = $self->{subroutine};
@@ -221,6 +222,9 @@ sub sendNotification {
     %users = %{$args{Users}};
   } else {
     %users = Configuration->config($args{Type});
+  }
+  if (defined($args{Key})) {
+    %users = ('defined_by_key' => $args{Key});
   }
 
   if ($args{Type} eq 'Prowl') {
