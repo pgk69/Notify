@@ -114,16 +114,14 @@ foreach $type (@types) {
   } else {
     %users = {};
   }
-  foreach $user (keys(%users)) {
-    $prg->sendNotification(Type        => $type,
-                           Application => $app,
-                           Event       => $event,
-                           Description => $desc,
-                           Priority    => $prio,
-                           URL         => 'https://github.com/pgk69',
-                           Users       => \%users,
-                           Key         => $key);
-  }
+  $prg->sendNotification(Type        => $type,
+                         Application => $app,
+                         Event       => $event,
+                         Description => $desc,
+                         Priority    => $prio,
+                         URL         => 'https://github.com/pgk69',
+                         Users       => \%users,
+                         Key         => $key);
 }
 
 Trace->Exit(0, 1, 0x00002, Configuration->config('Prg', 'Name'), $VERSION);

@@ -39,28 +39,12 @@ use vars qw(@ISA);
 use Trace;
 use CmdLine;
 use Configuration;
-#use DBAccess;
 use Utils;
 
 #
 # Module
 #
-use FindBin qw($Bin $Script $RealBin $RealScript);
-use LockFile::Simple qw(lock trylock unlock);
-use LWP;
-#use LWP::RobotUA;
-use HTTP::Cookies;
-
-use HTML::Entities;
-use utf8;
-use Text::Unidecode;
-
 use Storable;
-use Path::Class;
-use File::Path;
-use File::Basename;
-#use ZMQ::LibZMQ4;
-#use ZMQ::FFI;
 use WebService::Prowl;
 use WebService::NotifyMyAndroid;
 
