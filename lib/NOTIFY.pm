@@ -231,6 +231,7 @@ sub sendNotification {
     foreach my $user (keys %users) {
       my $ws = WebService::Prowl->new(apikey => $users{$user});
       if ($ws->verify) {
+         Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
          $ws->add(application => "$args{Application}",
                   event       => "$args{Event}",
                   description => "$args{Description}",
@@ -249,6 +250,7 @@ sub sendNotification {
       my $result = $nma->verify(apikey => $users{$user});
       if (defined($result->{success})) {
         # send a message
+        Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
         my $message = $nma->notify(apikey      => [$users{$user}],
                                    application => "$args{Application}",
                                    event       => "$args{Event}",
