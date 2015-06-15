@@ -70,7 +70,7 @@ $VERSION = Trace->new()->version($VERSION);
 $VERSION = Configuration->new()->version($VERSION);
 
 # Datenbank-Objekt: Regelt dei Datenbankzugriffe
-$VERSION = DBAccess->new()->version($VERSION);
+# $VERSION = DBAccess->new()->version($VERSION);
 
 # Kopie des Fehlerkanals erstellen zur gelegentlichen Abschaltung
 no warnings;
@@ -90,7 +90,26 @@ if ($@) {
 $VERSION = $prg->version($VERSION);
 #DBAccess->set_pers_Var(Configuration->config('DB', 'MYDB').'.config', 'Start');
 
-$prg->sendnotification();
+my %users;
+# Prowl
+%users = Configuration->config('Prowl');
+$prg->sendNotification(Application => 'Notifytest Prowl',
+                       Event       => 'Testbenachrichtigung',
+                       Description => 'Bislang keine weiteren Details',
+                       Priority    => '1',
+                       URL         => 'https://github.com/pgk69',
+                       Users       => \%users,
+                       Type        => 'Prowl');
+
+# NMA
+%users = Configuration->config('NMA');
+$prg->sendNotification(Application => 'Notifytest NMA',
+                       Event       => 'Testbenachrichtigung',
+                       Description => 'Bislang keine weiteren Details',
+                       Priority    => '1',
+                       URL         => 'https://github.com/pgk69',
+                       Users       => \%users,
+                       Type        => 'NMA');
 
 #my $cron = new Schedule::Cron($prg->can('action'), nofork => 1);
 #$cron->add_entry(Configuration->config('Prg', 'Aktiv'));

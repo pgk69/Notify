@@ -165,26 +165,6 @@ sub _init {
     }
     Trace->Exit(1, 0, 0x08000, join(" ", CmdLine->argument()));
   }
-  
-  # Einmalige oder parallele Ausführung
-  if (Configuration->config('Prg', 'LockFile')) {
-    $self->{LockFile} = File::Spec->canonpath(Utils::extendString(Configuration->config('Prg', 'LockFile'), "BIN|$Bin|SCRIPT|" . uc($Script)));
-    $self->{Lock} = LockFile::Simple->make(-max => 5, -delay => 1, -format => '%f', -autoclean => 1, -stale => 1, -wfunc => undef);
-    my $errtxt;
-    $SIG{'__WARN__'} = sub {$errtxt = $_[0]};
-    my $lockerg = $self->{Lock}->trylock($self->{LockFile});
-    undef($SIG{'__WARN__'});
-    if (defined($errtxt)) {
-      $errtxt =~ s/^(.*) .+ .+ line [0-9]+.*$/$1/;
-      chomp($errtxt);
-      Trace->Trc('S', 1, 0x00012, $errtxt) if defined($errtxt);
-    }
-    if (!$lockerg) {
-      Trace->Exit(0, 1, 0x00013, Configuration->prg, $self->{LockFile})
-    } else {
-      Trace->Trc('S', 1, 0x00014, $self->{LockFile})
-    }
-  }
 }
 
 
@@ -213,11 +193,19 @@ sub DESTROY {
 }
 
 
-sub sendnotification {
+sub sendNotification {
   #################################################################
   #     sendnotification
   #     Proc 1
   my $self = shift;
+  my %args = (Application => 'Notify',
+              Event       => 'Benachrichtigung',
+              Description => 'Keine weiteren Details',
+              Priority    => '1',
+              URL         => 'https://github.com/pgk69',
+              Users       => undef,
+              Type        => 'Prowl',
+              @_);
 
   my $merker          = $self->{subroutine};
   $self->{subroutine} = (caller(0))[3];
@@ -225,43 +213,49 @@ sub sendnotification {
   
   my $rc = 0;
 
-  my $event = "Scheduler Alert";
-  my $description = "Service ist not runnning";
+  $args{Event}       =~ tr/a-zA-Z0-9@.-:; //cd;
+  $args{Description} =~ tr/a-zA-Z0-9@.\-:; //cd;
+
   my %users;
+  if (defined($args{Users})) {
+    %users = %{$args{Users}};
+  } else {
+    %users = Configuration->config($args{Type});
+  }
 
-  $event =~ tr/a-zA-Z0-9@.-:; //cd;
-  $description =~ tr/a-zA-Z0-9@.\-:; //cd;
-
-  %users = Configuration->config('Prowl');
-  foreach my $user (keys %users) {
-    my $ws = WebService::Prowl->new(apikey => $users{$user});
-    if ($ws->verify) {
-       $ws->add(application => "Forex Scheduler",
-                event       => "$event",
-                description => "$description",
-                url         => "https://github.com/sekimura");
-    } else {
-      Trace->Trc('I', 1, 0x0a301, $user, $ws->error());
+  if ($args{Type} eq 'Prowl') {
+    foreach my $user (keys %users) {
+      my $ws = WebService::Prowl->new(apikey => $users{$user});
+      if ($ws->verify) {
+         $ws->add(application => "$args{Application}",
+                  event       => "$args{Event}",
+                  description => "$args{Description}",
+                  url         => "$args{URL}",
+                  priority    => "$args{Priority}");
+      } else {
+        Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $ws->error());
+      }
     }
   }
     
-  my $nma = WebService::NotifyMyAndroid->new;
-  %users = Configuration->config('NMA');
-  foreach my $user (keys %users) {
-    # verify an existing API key
-    my $result = $nma->verify(apikey => $users{$user});
-    if (defined($result->{success})) {
-      # send a message
-      my $message = $nma->notify(apikey      => [ $users{$user} ],
-                                 application => 'Forex Scheduler',
-                                 event       => "$event",
-                                 description => "$description",
-                                 priority    => 1);
-      if (!defined($message->{success})) {
-        Trace->Trc('I', 1, 0x0a302, $user, $result->{error}->{content});
+  if ($args{Type} eq 'NMA') {
+    my $nma = WebService::NotifyMyAndroid->new;
+    foreach my $user (keys %users) {
+      # verify an existing API key
+      my $result = $nma->verify(apikey => $users{$user});
+      if (defined($result->{success})) {
+        # send a message
+        my $message = $nma->notify(apikey      => [$users{$user}],
+                                   application => "$args{Application}",
+                                   event       => "$args{Event}",
+                                   description => "$args{Description}",
+                                   priority    => "$args{Priority}");
+        if (!defined($message->{success})) {
+          Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $result->{error}->{content});
+        }
+      } else {
+        Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $result->{error}->{content});
       }
-    } else {
-      Trace->Trc('I', 1, 0x0a302, $user, $result->{error}->{content});
     }
   } 
 
