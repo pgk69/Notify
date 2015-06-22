@@ -104,6 +104,8 @@
 0x0100c = '  -e, --event        Event, das die Notifikation ausgeloest hat'
 0x0100d = '  -p, --prio         Prioritaet, mit der die Notifikation ausgeloest wird'
 0x0100e = '  -c, --comment      Beschreibung der Notifikation'
+0x0100f = '  -f, --flag         Beim Aufruf wird ein Flag gesetzt, dass verhindert, dass weitere'
+0x01010 = '                     Aufrufe mit demselben Flag eine Benachrichtigung ausloesen'
 
 #########################################################################################
 # Programmausgabe

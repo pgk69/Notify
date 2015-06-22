@@ -44,6 +44,7 @@ use Utils;
 #
 # Module
 #
+use FindBin qw($Bin $Script $RealBin $RealScript);
 use Storable;
 use WebService::Prowl;
 use WebService::NotifyMyAndroid;
@@ -107,37 +108,6 @@ sub _init {
  
   Trace->Trc('S', 1, 0x00001, Configuration->prg, $VERSION . " (" . $$ . ")" . " Test: " . Trace->test() . " Parameter: " . CmdLine->new()->{ArgStrgRAW});
   
-  if (Configuration->config('Prg', 'Plugin')) {
-
-    # refs ausschalten wg. dyn. Proceduren
-    no strict 'refs';
-    my %plugin = ();
-
-    # Bearbeiten aller Erweiterungsmodule die in der INI-Date
-    # in Sektion [Prg] unter "Plugin =" definiert sind
-    foreach (split(/ /, Configuration->config('Prg', 'Plugin'))) {
-
-      # Falls ein Modul existiert
-      if (-e "$self->{Pfad}/plugins/${_}.pm") {
-
-        # Einbinden des Moduls
-        require $_ . '.pm';
-        $_->import();
-
-        # Initialisieren des Moduls, falls es eine eigene Sektion
-        # [<Modulname>] fuer das Module in der INI-Datei gibt
-        $plugin{$_} = eval {$_->new(Configuration->config('Plugin ' . $_))};
-        eval {
-          $plugin{$_} ? $plugin{$_}->DESTROY : ($_ . '::DESTROY')->()
-            if (CmdLine->option('erase'));
-        };
-      }
-    }
-    use strict;
-  }
-
-  # Module::Refresh->refresh;
-  
   # Test der benoetigten INI-Variablen
   # DB-Zugriff
 
@@ -148,6 +118,35 @@ sub _init {
       Trace->Exit(0, 1, 0x00002, Configuration->prg, $VERSION);
     }
     Trace->Exit(1, 0, 0x08000, join(" ", CmdLine->argument()));
+  }
+  
+  # Einmalige oder parallele Ausführung
+  if (Configuration->config('Notfy', 'LockFile')) {
+    $self->{LockFile} = File::Spec->canonpath(Utils::extendString(Configuration->config('Notfy', 'LockFile'), "BIN|$Bin|SCRIPT|" . uc($Script)));
+    $self->{Lock} = LockFile::Simple->make(-max => 5, -delay => 1, -format => '%f', -autoclean => 1, -stale => 1, -wfunc => undef);
+    my $errtxt;
+    $SIG{'__WARN__'} = sub {$errtxt = $_[0]};
+    my $lockerg = $self->{Lock}->trylock($self->{LockFile});
+    undef($SIG{'__WARN__'});
+    if (defined($errtxt)) {
+      $errtxt =~ s/^(.*) .+ .+ line [0-9]+.*$/$1/;
+      chomp($errtxt);
+      Trace->Trc('S', 1, 0x00012, $errtxt) if defined($errtxt);
+    }
+    if (!$lockerg) {
+      Trace->Exit(0, 1, 0x00013, Configuration->prg, $self->{LockFile})
+    } else {
+      Trace->Trc('S', 1, 0x00014, $self->{LockFile})
+    }
+  }
+  
+  if (Configuration->config('Notify', 'Storable')) {
+    $self->{Storable} = Utils::extendString(Configuration->config('Notify', 'Storable'), "BIN|$Bin|SCRIPT|" . uc($Script));
+    eval {$self->{Store} = retrieve $self->{Storable}};
+    #if (!defined($self->{Store})) {
+    #  $self->{Store} = \('State' => 0);
+    #  store($self->{Store}, $self->{Storable}) or die "Can't store in $self->{Storable}!\n";
+    #}
   }
 }
 
@@ -190,6 +189,7 @@ sub sendNotification {
               URL         => 'https://github.com/pgk69',
               Users       => undef,
               Key         => undef,
+              Flag        => undef,
               @_);
 
   my $merker          = $self->{subroutine};
@@ -211,42 +211,51 @@ sub sendNotification {
     %users = ('defined_by_key' => $args{Key});
   }
 
-  if ($args{Type} eq 'Prowl') {
-    foreach my $user (keys %users) {
-      my $ws = WebService::Prowl->new(apikey => $users{$user});
-      if ($ws->verify) {
-         Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
-         $ws->add(application => "$args{Application}",
-                  event       => "$args{Event}",
-                  description => "$args{Description}",
-                  url         => "$args{URL}",
-                  priority    => "$args{Priority}");
-      } else {
-        Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $ws->error());
+  my $apikey;
+  my $nma = WebService::NotifyMyAndroid->new;
+
+  foreach my $user (keys %users) {
+    $apikey =  $users{$user};
+    if (!defined($self->{Storable}) || !defined($args{Flag}) || 
+        (!defined($self->{Store}) || !defined($self->{Store}->{$apikey}) || ($self->{Store}->{$apikey} ne $args{Flag}))) {
+      if (defined($self->{Storable}) && defined($args{Flag}) && 
+         (!defined($self->{Store}) || !defined($self->{Store}->{$apikey}) || ($self->{Store}->{$apikey} ne $args{Flag}))) {
+        $self->{Store}->{$apikey} = $args{Flag};
+        store($self->{Store}, $self->{Storable}) or die "Can't store in $self->{Storable}!\n";
       }
-    }
-  }
-    
-  if ($args{Type} eq 'NMA') {
-    my $nma = WebService::NotifyMyAndroid->new;
-    foreach my $user (keys %users) {
-      # verify an existing API key
-      my $result = $nma->verify(apikey => $users{$user});
-      if (defined($result->{success})) {
-        # send a message
-        Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
-        my $message = $nma->notify(apikey      => [$users{$user}],
-                                   application => "$args{Application}",
-                                   event       => "$args{Event}",
-                                   description => "$args{Description}",
-                                   priority    => "$args{Priority}");
-        if (!defined($message->{success})) {
+      if ($args{Type} eq 'Prowl') {
+        my $ws = WebService::Prowl->new(apikey => $apikey);
+        if ($ws->verify) {
+           Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
+           $ws->add(application => "$args{Application}",
+                    event       => "$args{Event}",
+                    description => "$args{Description}",
+                    url         => "$args{URL}",
+                    priority    => "$args{Priority}");
+        } else {
+          Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $ws->error());
+        }
+      }
+      
+      if ($args{Type} eq 'NMA') {
+        # verify an existing API key
+        my $result = $nma->verify(apikey => $apikey);
+        if (defined($result->{success})) {
+          # send a message
+          Trace->Trc('I', 1, '%s Versand an %s', $args{Type}, $user);
+          my $message = $nma->notify(apikey      => [$users{$user}],
+                                     application => "$args{Application}",
+                                     event       => "$args{Event}",
+                                     description => "$args{Description}",
+                                     priority    => "$args{Priority}");
+          if (!defined($message->{success})) {
+            Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $result->{error}->{content});
+          }
+        } else {
           Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $result->{error}->{content});
         }
-      } else {
-        Trace->Trc('I', 1, '%s Versand an %s nicht erfolgreich (%s)', $args{Type}, $user, $result->{error}->{content});
       }
-    }
+    } 
   } 
 
   Trace->Trc('S', 2, 0x00002, $self->{subroutine});
