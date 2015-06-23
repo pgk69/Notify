@@ -67,8 +67,9 @@ $VERSION = CmdLine->new('Service'     => 'webservice:s',
                         'Comment'     => 'comment:s',
                         'Prio'        => 'priority:s',
                         'User'        => 'user:s',
-                        'Flag'        => 'flag:s',
-                        'APIKey'      => 'key:s')->version($VERSION);
+                        'APIKey'      => 'key:s',
+                        'Group'       => 'group:s',
+                        'Flag'        => 'flag:s')->version($VERSION);
 
 # Trace-Objekt: Liest und speichert die Meldungstexte; gibt Tracemeldungen aus
 $VERSION = Trace->new()->version($VERSION);
@@ -96,13 +97,14 @@ if ($@) {
 }
 $VERSION = $prg->version($VERSION);
 
-my ($type, $app, $event, $desc, $prio, $user, $key, @types, %users, $flag);
+my ($type, $app, $event, $desc, $prio, $user, $key, @types, %users, $group, $flag);
 @types = defined(CmdLine->option('Service'))     ? CmdLine->option('Service')     : ('Prowl', 'NMA'); 
 $event = defined(CmdLine->option('Event'))       ? CmdLine->option('Event')       : 'Testbenachrichtigung';
 $desc  = defined(CmdLine->option('Comment'))     ? CmdLine->option('Comment')     : 'Bislang keine weiteren Details';
 $prio  = defined(CmdLine->option('Prio'))        ? CmdLine->option('Prio')        : 1; 
 $user  = defined(CmdLine->option('User'))        ? CmdLine->option('User')        : undef; 
 $key   = defined(CmdLine->option('APIKey'))      ? CmdLine->option('APIKey')      : undef; 
+$group = defined(CmdLine->option('Group'))       ? CmdLine->option('Group')       : undef; 
 $flag  = defined(CmdLine->option('Flag'))        ? CmdLine->option('Flag')        : undef; 
 
 foreach $type (@types) {
@@ -124,6 +126,7 @@ foreach $type (@types) {
                          URL         => 'https://github.com/pgk69',
                          Users       => \%users,
                          Key         => $key,
+                         Group       => $group,
                          Flag        => $flag);
 }
 

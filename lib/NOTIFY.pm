@@ -143,10 +143,6 @@ sub _init {
   if (Configuration->config('Notify', 'Storable')) {
     $self->{Storable} = Utils::extendString(Configuration->config('Notify', 'Storable'), "BIN|$Bin|SCRIPT|" . uc($Script));
     eval {$self->{Store} = retrieve $self->{Storable}};
-    #if (!defined($self->{Store})) {
-    #  $self->{Store} = \('State' => 0);
-    #  store($self->{Store}, $self->{Storable}) or die "Can't store in $self->{Storable}!\n";
-    #}
   }
 }
 
@@ -189,6 +185,7 @@ sub sendNotification {
               URL         => 'https://github.com/pgk69',
               Users       => undef,
               Key         => undef,
+              Group       => undef,
               Flag        => undef,
               @_);
 
@@ -212,17 +209,25 @@ sub sendNotification {
   }
 
   my $apikey;
+  my $sendCurrentNotification;
   my $nma = WebService::NotifyMyAndroid->new;
 
   foreach my $user (keys %users) {
     $apikey =  $users{$user};
-    if (!defined($self->{Storable}) || !defined($args{Flag}) || 
-        (!defined($self->{Store}) || !defined($self->{Store}->{$apikey}) || ($self->{Store}->{$apikey} ne $args{Flag}))) {
-      if (defined($self->{Storable}) && defined($args{Flag}) && 
-         (!defined($self->{Store}) || !defined($self->{Store}->{$apikey}) || ($self->{Store}->{$apikey} ne $args{Flag}))) {
-        $self->{Store}->{$apikey} = $args{Flag};
+
+    my $uniqueGroupKey;
+    $sendCurrentNotification = 1;
+    if (defined($self->{Storable}) && defined($args{Flag})) {
+      $uniqueGroupKey = defined($args{Group}) ? "$args{Group}:$apikey" : $apikey; 
+      $sendCurrentNotification = !(defined($self->{Store}) && defined($self->{Store}->{$uniqueGroupKey}) && ($self->{Store}->{$uniqueGroupKey} eq $args{Flag}));
+    }
+
+   if ($sendCurrentNotification) {
+      if (defined($uniqueGroupKey)) {
+        $self->{Store}->{$uniqueGroupKey} = $args{Flag};
         store($self->{Store}, $self->{Storable}) or die "Can't store in $self->{Storable}!\n";
       }
+
       if ($args{Type} eq 'Prowl') {
         my $ws = WebService::Prowl->new(apikey => $apikey);
         if ($ws->verify) {
